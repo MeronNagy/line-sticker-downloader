@@ -68,12 +68,16 @@ jobs:
           cargo build --release ${{ matrix.args }}
 
       - name: Rename binary
-        if: matrix.name == 'Linux'
-        run: cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-linux
-
-      - name: Rename binary
-        if: matrix.name == 'macOS Intel'
-        run: cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-apple-darwin
+        if: matrix.name != 'Windows'
+        run: |
+          ls target/release
+          if [ "${{ matrix.name }}" == "macOS Intel" ]; then
+            cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-apple-darwin
+          elif [ "${{ matrix.name }}" == "macOS ARM" ]; then
+            cp target/release/line-sticker-downloader target/release/line-sticker-downloader-aarch64-apple-darwin
+          else
+            cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-linux
+          fi 
 
       - uses: softprops/action-gh-release@v2
         if: matrix.name == 'Windows'
