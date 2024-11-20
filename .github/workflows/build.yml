@@ -67,12 +67,26 @@ jobs:
         run: |
           cargo build --release ${{ matrix.args }}
 
-      - name: Upload build artifacts
+      - name: Prepare artifacts
         run: |
-          mkdir -p $GITHUB_WORKSPACE/artifacts
-          cp target/release/* $GITHUB_WORKSPACE/artifacts/
+          if [ "${{ matrix.platform }}" == "windows-latest" ]; then
+            cp target/release/line-sticker-downloader.exe ${{ github.workspace }}/artifacts/line-sticker-downloader.exe
+          elif [ "${{ matrix.name}}" == "macOS Intel" ]; then
+            cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-x86_64-apple-darwin
+          elif [ "${{ matrix.name}}" == "macOS M1 and above" ]; then
+            cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-aarch64-apple-darwin
+          else
+            cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-x86_64-linux
+          fi
 
-      - name: Create GitHub release
+      - if: matrix.name == 'Windows'
         uses: softprops/action-gh-release@v2
         with:
-          files: $GITHUB_WORKSPACE/artifacts/*
+          tag_name: "${{ needs.set-version.outputs.VERSION }}"
+          files:  target/release/line-sticker-downloader.exe
+
+      - if: matrix.name == 'Linux'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "${{ needs.set-version.outputs.VERSION }}"
+          files:  target/release/line-sticker-downloader-x86_64-linux
