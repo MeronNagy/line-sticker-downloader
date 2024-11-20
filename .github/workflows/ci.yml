@@ -2,7 +2,8 @@ name: CI
 on:
   push:
     paths:
-      - 'src-tauri/**'
+      - 'src/**'
+      - '.github/workflows/ci.yml'
 
 defaults:
   run:
