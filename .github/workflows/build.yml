@@ -79,14 +79,8 @@ jobs:
             cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-x86_64-linux
           fi
 
-      - if: matrix.name == 'Windows'
-        uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v2
         with:
+          name: Nightly Build ${{ needs.set-version.outputs.VERSION }}
           tag_name: "${{ needs.set-version.outputs.VERSION }}"
-          files:  target/release/line-sticker-downloader.exe
-
-      - if: matrix.name == 'Linux'
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: "${{ needs.set-version.outputs.VERSION }}"
-          files:  target/release/line-sticker-downloader-x86_64-linux
+          files: ${{ github.workspace }}/artifacts/*
