@@ -32,7 +32,7 @@ jobs:
       matrix:
         include:
           - platform: 'macos-latest'
-            name: 'macOS M1 and above'
+            name: 'macOS ARM'
             args: '--target aarch64-apple-darwin'
           - platform: 'macos-latest' # for Intel based macs.
             name: 'macOS Intel'
@@ -66,6 +66,7 @@ jobs:
       - name: Build the project
         run: |
           cargo build --release ${{ matrix.args }}
+          ls -lha target/release
 
       - name: Prepare artifacts
         run: |
@@ -73,7 +74,7 @@ jobs:
             cp target/release/line-sticker-downloader.exe ${{ github.workspace }}/artifacts/line-sticker-downloader.exe
           elif [ "${{ matrix.name}}" == "macOS Intel" ]; then
             cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-x86_64-apple-darwin
-          elif [ "${{ matrix.name}}" == "macOS M1 and above" ]; then
+          elif [ "${{ matrix.name}}" == "macOS ARM" ]; then
             cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-aarch64-apple-darwin
           else
             cp target/release/line-sticker-downloader ${{ github.workspace }}/artifacts/line-sticker-downloader-x86_64-linux
