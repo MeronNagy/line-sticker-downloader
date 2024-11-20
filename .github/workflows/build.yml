@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'src/**'
+      - '.github/workflows/build.yml'
 
   workflow_dispatch:
 
@@ -69,7 +70,7 @@ jobs:
       - name: Upload build artifacts
         run: |
           mkdir -p $GITHUB_WORKSPACE/artifacts
-          cp target/${{ matrix.args }}/release/* $GITHUB_WORKSPACE/artifacts/
+          cp target/release/* $GITHUB_WORKSPACE/artifacts/
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
