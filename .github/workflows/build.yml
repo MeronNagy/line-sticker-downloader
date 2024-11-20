@@ -70,7 +70,6 @@ jobs:
       - name: Rename binary
         if: matrix.name != 'Windows'
         run: |
-          ls target/release
           if [ "${{ matrix.name }}" == "macOS Intel" ]; then
             cp target/x86_64-apple-darwin/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-apple-darwin
           elif [ "${{ matrix.name }}" == "macOS ARM" ]; then
