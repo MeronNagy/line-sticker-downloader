@@ -1,0 +1,13 @@
+[package]
+name = "line-sticker-downloader"
+version = "0.1.0"
+license = "MIT"
+authors = ["MeronNagy"]
+edition = "2021"
+
+[dependencies]
+reqwest = "0.12.9"
+url = "2.5.3"
+tokio = { version ="1.41.1", features = ["full"] }
+scraper = "0.21.0"
+regex = "1.11.1"
