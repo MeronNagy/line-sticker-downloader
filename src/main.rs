@@ -1,8 +1,4 @@
-use regex::Regex;
-use reqwest;
 use scraper::{Html, Selector};
-use std::collections::HashSet;
-use url::Url;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -14,7 +10,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     for url in &args[1..] {
-        if Url::parse(url).is_ok() {
+        if url::Url::parse(url).is_ok() {
             println!("Fetching {}", url);
             download_stickers(url).await?;
         } else {
@@ -36,16 +32,16 @@ async fn download_stickers(url: &str) -> Result<(), Box<dyn std::error::Error>> 
 
     let selector = Selector::parse(r#"span.mdCMN09Image"#).unwrap();
 
-    let mut img_urls = HashSet::new();
-    for (_, element) in document.select(&selector).enumerate() {
+    let mut img_urls = std::collections::HashSet::new();
+    for element in document.select(&selector) {
         if let Some(style) = element.value().attr("style") {
             img_urls.insert(extract_image_url(style));
         }
     }
 
     for img_url in img_urls {
-        let re = Regex::new(r"/(\d+)/").unwrap();
-        let id = re.captures(&*img_url).unwrap().get(1).unwrap().as_str();
+        let re = regex::Regex::new(r"/(\d+)/").unwrap();
+        let id = re.captures(&img_url).unwrap().get(1).unwrap().as_str();
         let file_path = format!("{}/{:03}.png", directory, id);
 
         if std::path::Path::new(&file_path).exists() {
