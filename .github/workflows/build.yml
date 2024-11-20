@@ -72,9 +72,9 @@ jobs:
         run: |
           ls target/release
           if [ "${{ matrix.name }}" == "macOS Intel" ]; then
-            cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-apple-darwin
+            cp target/x86_64-apple-darwin/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-apple-darwin
           elif [ "${{ matrix.name }}" == "macOS ARM" ]; then
-            cp target/release/line-sticker-downloader target/release/line-sticker-downloader-aarch64-apple-darwin
+            cp target/aarch64-apple-darwin/release/line-sticker-downloader target/release/line-sticker-downloader-aarch64-apple-darwin
           else
             cp target/release/line-sticker-downloader target/release/line-sticker-downloader-x86_64-linux
           fi 
