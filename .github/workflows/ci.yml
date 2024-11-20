@@ -1,0 +1,75 @@
+name: CI
+on:
+  push:
+    paths:
+      - 'src-tauri/**'
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  # Check Code style quickly by running `rustfmt` over all code
+  rustfmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - run: rustup component add rustfmt
+      - run: cargo fmt --all --check --manifest-path src-tauri/Cargo.toml
+
+  # Ensure there are no clippy warnings
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update stable && rustup default stable
+      - run: rustup component add clippy
+      - run: | 
+          sudo apt-get update
+          sudo apt-get install libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev pkg-config -y
+      - run: cargo clippy --workspace --all-targets --no-deps --manifest-path src-tauri/Cargo.toml -- -D warnings
+  test:
+    runs-on: ${{ matrix.os }}
+    env:
+      CARGO_PROFILE_DEV_DEBUG: 1
+      CARGO_PROFILE_TEST_DEBUG: 1
+      CARGO_INCREMENTAL: 0
+      CARGO_PUBLIC_NETWORK_TESTS: 1
+      # Workaround for https://github.com/rust-lang/rustup/issues/3036
+      RUSTUP_WINDOWS_PATH_ADD_BIN: 0
+    strategy:
+      matrix:
+        include:
+          - name: Linux x86_64 stable
+            os: ubuntu-latest
+            rust: stable
+            other: i686-unknown-linux-gnu
+          - name: macOS aarch64 stable
+            os: macos-14
+            rust: stable
+            other: x86_64-apple-darwin
+          - name: Windows x86_64 MSVC stable
+            os: windows-latest
+            rust: stable-msvc
+            other: i686-pc-windows-msvc
+    name: Tests ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update stable
+      - run: rustup update --no-self-update ${{ matrix.rust }} && rustup default ${{ matrix.rust }}
+      - run: rustup target add ${{ matrix.other }}
+      - run: sudo apt update -y && sudo apt install lldb gcc-multilib libsecret-1-0 libsecret-1-dev libgtk-3-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev libwebkit2gtk-4.1-dev libxdo-dev pkg-config -y
+        if: matrix.os == 'ubuntu-latest'
+      - run: rustup component add rustfmt || echo "rustfmt not available"
+      - name: Configure extra test environment
+        run: echo CARGO_CONTAINER_TESTS=1 >> $GITHUB_ENV
+        if: matrix.os == 'ubuntu-latest'
+      - run: cargo test -p untitled --manifest-path src-tauri/Cargo.toml

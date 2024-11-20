@@ -1,0 +1,27 @@
+name: Security audit
+
+permissions:
+  contents: read
+
+on:
+  push:
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+jobs:
+  cargo_deny:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        checks:
+          - advisories
+          - bans licenses sources
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        # Prevent sudden announcement of a new advisory from failing ci:
+        continue-on-error: ${{ matrix.checks == 'advisories' }}
+        with:
+          command: check ${{ matrix.checks }}
+          rust-version: stable
+          manifest-path: './src-tauri/Cargo.toml'
