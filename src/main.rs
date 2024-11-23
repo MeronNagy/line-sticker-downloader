@@ -88,7 +88,9 @@ mod tests {
 
     #[test]
     fn test_get_title() {
-        let document = Html::parse_document(r#"<div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>"#);
+        let document = Html::parse_document(
+            r#"<div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>"#,
+        );
         let result = get_title(&document);
         assert_eq!(result, "We are NewJeans☆")
     }
