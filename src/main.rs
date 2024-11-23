@@ -84,7 +84,7 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
     let mut url_queue: VecDeque<String> = VecDeque::new();
     url_queue.push_back(initial_url.to_string());
 
-    while let Some(url) = url_queue.pop_front() {
+    while let Some(url) = url_queue.pop_back() {
         let response = reqwest::get(&url).await?.text().await?;
         let document = Html::parse_document(&response);
 
