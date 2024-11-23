@@ -1,7 +1,7 @@
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde_json::Value;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 
 #[derive(Debug, serde::Deserialize)]
 struct Item {
@@ -61,6 +61,7 @@ async fn download_stickers_from_search_query(
         let total_count = json.total_count;
         let items = json.items;
 
+        println!("Fetching Stickers from: {}", url);
         download_items(items).await?;
 
         offset += limit;
@@ -88,6 +89,8 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
         let document = Html::parse_document(&response);
 
         if url.contains("/stickershop/author/") {
+            println!("Fetching Stickers from: {}", url);
+
             url_queue.extend(extract_author_page_urls(url, document)?);
             continue;
         }
@@ -119,8 +122,8 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
 fn extract_author_page_urls(
     url: String,
     document: Html,
-) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
-    let mut urls: HashSet<String> = HashSet::new();
+) -> Result<BTreeSet<String>, Box<dyn std::error::Error>> {
+    let mut urls: BTreeSet<String> = BTreeSet::new();
 
     let author_item_selector = Selector::parse(r#"li[data-test="author-item"]"#)?;
     let a_selector = Selector::parse("a")?;
