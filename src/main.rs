@@ -61,7 +61,10 @@ async fn download_stickers_from_search_query(
         let total_count = json.total_count;
         let items = json.items;
 
-        println!("Fetching Stickers for query: {} Page: {}", search_query, offset);
+        println!(
+            "Fetching Stickers for query: {} Page: {}",
+            search_query, offset
+        );
         download_items(items).await?;
 
         offset += limit;
