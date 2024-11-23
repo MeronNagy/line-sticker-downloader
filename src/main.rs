@@ -1,6 +1,7 @@
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -25,30 +26,116 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn download_stickers(url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let response = reqwest::get(url).await?.text().await?;
+async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut url_queue: VecDeque<String> = VecDeque::new();
+    url_queue.push_back(initial_url.to_string());
 
-    let document = Html::parse_document(response.as_str());
+    while let Some(url) = url_queue.pop_front() {
+        let response = reqwest::get(&url).await?.text().await?;
+        let document = Html::parse_document(response.as_str());
 
-    let directory = sanitize_directory_name(&extract_title_from_document(&document)?);
-
-    for (id, value) in extract_sticker_data_from_document(&document)? {
-        if let Some(url) = value.get("soundUrl").and_then(|v| v.as_str()) {
-            if !url.is_empty() {
-                download_file(url, &id, &directory).await?;
-            }
+        if url.contains("/stickershop/author/") {
+            url_queue.extend(extract_author_page_urls(url, document)?);
+            continue;
         }
 
-        if let Some(url) = value.get("animationUrl").and_then(|v| v.as_str()) {
-            if !url.is_empty() {
-                download_file(url, &id, &directory).await?;
-            } else if let Some(url) = value.get("staticUrl").and_then(|v| v.as_str()) {
-                download_file(url, &id, &directory).await?;
+        if url.contains("/search/sticker/") {
+            url_queue.extend(extract_search_page_urls(url, document)?);
+            continue;
+        }
+
+        let directory = sanitize_directory_name(&extract_title_from_document(&document)?);
+
+        for (id, value) in extract_sticker_data_from_document(&document)? {
+            if let Some(url) = value.get("soundUrl").and_then(|v| v.as_str()) {
+                if !url.is_empty() {
+                    download_file(url, &id, &directory).await?;
+                }
+            }
+
+            if let Some(url) = value.get("animationUrl").and_then(|v| v.as_str()) {
+                if !url.is_empty() {
+                    download_file(url, &id, &directory).await?;
+                } else if let Some(url) = value.get("staticUrl").and_then(|v| v.as_str()) {
+                    download_file(url, &id, &directory).await?;
+                }
             }
         }
     }
 
     Ok(())
+}
+
+fn extract_search_page_urls(
+    url: String,
+    document: Html,
+) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    let mut urls: HashSet<String> = HashSet::new();
+
+    let ul_selector = Selector::parse(r#"ul[data-test="search-sticker-item-list"] a"#)?;
+    for element in document.select(&ul_selector) {
+        if let Some(href) = element.value().attr("href") {
+            urls.insert(update_url(&url, href)?);
+        }
+    }
+
+    if let Some(href) = extract_next_button_href(document)? {
+        urls.insert(update_url(&url, href.as_str())?);
+    }
+
+    Ok(urls)
+}
+
+fn extract_author_page_urls(
+    url: String,
+    document: Html,
+) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
+    let mut urls: HashSet<String> = HashSet::new();
+
+    let author_item_selector = Selector::parse(r#"li[data-test="author-item"]"#)?;
+    let a_selector = Selector::parse("a")?;
+    for li in document.select(&author_item_selector) {
+        if let Some(a_tag) = li.select(&a_selector).next() {
+            if let Some(href) = a_tag.value().attr("href") {
+                urls.insert(update_url(&url, href)?);
+            }
+        }
+    }
+
+    if let Some(href) = extract_next_button_href(document)? {
+        urls.insert(update_url(&url, href.as_str())?);
+    }
+
+    Ok(urls)
+}
+
+fn extract_next_button_href(document: Html) -> Result<Option<String>, Box<dyn std::error::Error>> {
+    let next_btn_selector = Selector::parse(r#"a[data-test="next-btn"]"#)?;
+    if let Some(next_btn) = document.select(&next_btn_selector).next() {
+        if let Some(next_href) = next_btn.value().attr("href") {
+            return Ok(Some(next_href.to_string()));
+        }
+    }
+
+    Ok(None)
+}
+
+fn update_url(url: &str, path_or_query_params: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let mut new_url = url::Url::parse(url)?;
+    new_url.set_query(None);
+
+    if path_or_query_params.starts_with('/') {
+        if let Some((path, query)) = path_or_query_params.split_once('?') {
+            new_url.set_path(path);
+            new_url.set_query(Some(query));
+        } else {
+            new_url.set_path(path_or_query_params);
+        }
+    } else {
+        new_url.set_query(Some(path_or_query_params.trim_start_matches('?')));
+    }
+
+    Ok(new_url.to_string())
 }
 
 fn sanitize_directory_name(name: &str) -> String {
@@ -69,13 +156,10 @@ fn extract_title_from_document(document: &Html) -> Result<String, String> {
     }
 }
 
-fn extract_sticker_data_from_document(
-    document: &Html,
-) -> Result<std::collections::HashMap<String, Value>, String> {
+fn extract_sticker_data_from_document(document: &Html) -> Result<HashMap<String, Value>, String> {
     let selector = Selector::parse("li.FnStickerPreviewItem").unwrap();
 
-    let mut sticker_data_map: std::collections::HashMap<String, Value> =
-        std::collections::HashMap::new();
+    let mut sticker_data_map: HashMap<String, Value> = HashMap::new();
     for element in document.select(&selector) {
         if let Some(data_preview) = element.value().attr("data-preview") {
             match serde_json::from_str::<Value>(data_preview) {
@@ -167,13 +251,13 @@ mod tests {
     fn test_extract_sticker_data_from_document() {
         let document = Html::parse_document(
             r#"
-        <ul>
-            <li class="for_testing"></li>
-            <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
-            <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
-            <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
-            <li class="for_testing"></li>
-        </ul>
+            <ul>
+                <li class="for_testing"></li>
+                <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
+                <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
+                <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
+                <li class="for_testing"></li>
+            </ul>
         "#,
         );
 
@@ -200,9 +284,9 @@ mod tests {
     fn test_extract_sticker_data_from_document_error() {
         let document = Html::parse_document(
             r#"
-        <ul>
-            <li class="FnStickerPreviewItem" data-preview="{ []{{]]}{{fsdfsf435 }">
-        </ul>
+            <ul>
+                <li class="FnStickerPreviewItem" data-preview="{ []{{]]}{{fsdfsf435 }">
+            </ul>
         "#,
         );
 
@@ -243,7 +327,7 @@ mod tests {
 
         let url = server.url();
         let _m = server.mock("GET", "/test")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
             .with_body(r#"
                 <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Pokémon Pixel Art: Gold & Silver Edition</p>
@@ -276,7 +360,7 @@ mod tests {
 
         let url = server.url();
         let _m = server.mock("GET", "/test")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
             .with_body(r#"
                 <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">THE POWERPUFF GIRLS X NEWJEANS</p>
@@ -305,7 +389,7 @@ mod tests {
 
         let url = server.url();
         let _m = server.mock("GET", "/test")
-            .with_status(201)
+            .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
             .with_body(r#"
                 <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">THE POWERPUFF GIRLS X NEWJEANS</p>
@@ -318,20 +402,76 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_download_stickers_wrong_url() {
+    async fn test_download_stickers_author_page_invalid_href() {
         let mut server = mockito::Server::new_async().await;
 
         let url = server.url();
         let _m = server
-            .mock("GET", "/test")
-            .with_status(201)
+            .mock("GET", "/stickershop/author/test")
+            .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body("<div></div>")
+            .with_body(
+                r#"
+                <ul>
+                    <li class="mdCMN02Li" data-test="author-item">
+                        <a href="/test">
+                    </li>
+                </ul>
+            "#,
+            )
             .create_async()
             .await;
 
-        let actual = download_stickers(format!("{}/test", url).as_str()).await;
-        assert!(actual.is_err(), "Could not find the sticker-name-title in the document. Please check that the URL points to a valid sticker page.");
+        let _m2 = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(
+                r#"
+                <div></div>
+            "#,
+            )
+            .create_async()
+            .await;
+
+        let actual = download_stickers(format!("{}/stickershop/author/test", url).as_str()).await;
+        assert!(actual.is_err(), "{}", actual.unwrap_err());
+    }
+
+    #[tokio::test]
+    async fn test_download_stickers_search_page_invalid_href() {
+        let mut server = mockito::Server::new_async().await;
+
+        let url = server.url();
+        let _m = server
+            .mock("GET", "/search/sticker/en?q=sanrio")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(r#"
+                <ul data-v-5019b439="" data-v-52659312="" data-test="search-sticker-item-list">
+                    <li data-v-5019b439="">
+                        <a data-v-734783a5="" data-v-5019b439="" href="/stickershop/product/33267/en"></a>
+                    </li>
+                </ul>
+            "#)
+            .create_async()
+            .await;
+
+        let _m2 = server
+            .mock("GET", "/stickershop/product/33267/en")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(
+                r#"
+                <div></div>
+            "#,
+            )
+            .create_async()
+            .await;
+
+        let actual =
+            download_stickers(format!("{}/search/sticker/en?q=sanrio", url).as_str()).await;
+        assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 
     fn delete_directory_if_exists(directory: &str) {
@@ -339,5 +479,86 @@ mod tests {
         if directory_path.exists() {
             std::fs::remove_dir_all(directory_path).expect("Failed to remove directory");
         }
+    }
+
+    #[test]
+    fn test_extract_author_page_urls() {
+        let document = Html::parse_document(
+            r#"
+            <ul>
+                <li class="mdCMN02Li" data-test="author-item">
+                    <a href="/stickershop/product/32279/en">
+                </li>
+            </ul>
+            <a class="mdCMN14Next" href="?page=2" data-test="next-btn">Next</a>
+        "#,
+        );
+
+        let actual = extract_author_page_urls(
+            "https://store.line.me/stickershop/author/32/en".to_string(),
+            document,
+        )
+        .unwrap();
+
+        assert_eq!(actual.len(), 2);
+        assert!(actual.contains("https://store.line.me/stickershop/product/32279/en"));
+        assert!(actual.contains("https://store.line.me/stickershop/author/32/en?page=2"));
+    }
+
+    #[test]
+    fn test_extract_search_page_urls() {
+        let document = Html::parse_document(
+            r#"
+            <ul data-v-5019b439="" data-v-52659312="" data-test="search-sticker-item-list">
+                <li data-v-5019b439="">
+                    <a data-v-734783a5="" data-v-5019b439="" href="/stickershop/product/33267/en"></a>
+                </li>
+            </ul>
+            <a data-v-06abf17a="" aria-current="page" href="/search/sticker/en?q=sanrio&amp;page=2" class="router-link-active router-link-exact-active next-page" data-test="next-btn">Next</a>
+        "#,
+        );
+
+        let actual = extract_search_page_urls(
+            "https://store.line.me/search/sticker/en?q=sanrio".to_string(),
+            document,
+        )
+        .unwrap();
+
+        assert_eq!(actual.len(), 2);
+        assert!(actual.contains("https://store.line.me/stickershop/product/33267/en"));
+        assert!(actual.contains("https://store.line.me/search/sticker/en?q=sanrio&page=2"));
+    }
+
+    #[test]
+    fn test_update_url() {
+        let actual = update_url(
+            "https://store.line.me/stickershop/author/32/en",
+            "/stickershop/product/20095/en",
+        )
+        .unwrap();
+        assert_eq!(actual, "https://store.line.me/stickershop/product/20095/en");
+
+        let actual =
+            update_url("https://store.line.me/stickershop/author/32/en", "?page=2").unwrap();
+        assert_eq!(
+            actual,
+            "https://store.line.me/stickershop/author/32/en?page=2"
+        );
+
+        let actual =
+            update_url("https://store.line.me/stickershop/author/32/en", "page=2").unwrap();
+        assert_eq!(
+            actual,
+            "https://store.line.me/stickershop/author/32/en?page=2"
+        );
+
+        let actual = update_url("https://store.line.me/stickershop/author/32/en", "abc").unwrap();
+        assert_eq!(actual, "https://store.line.me/stickershop/author/32/en?abc");
+    }
+
+    #[test]
+    fn test_update_url_error() {
+        let actual = update_url("not-a-url", "/stickershop/product/20095/en");
+        assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 }
