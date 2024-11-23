@@ -6,7 +6,19 @@ https://store.line.me/stickershop/product/22239964/en
 Usage:  
 `.\line-sticker-downloader.exe <url1> <url2> ...`  
 
-Example:
+Example downloading specific stickers
+- https://store.line.me/stickershop/product/28170905/en
+- https://store.line.me/stickershop/product/6920150/en
 ```shell
 .\line-sticker-downloader.exe https://store.line.me/stickershop/product/28170905/en https://store.line.me/stickershop/product/683/en
+```
+
+Example downloading search https://store.line.me/search/sticker/en?q=hatsune+miku
+```shell
+.\line-sticker-downloader.exe https://store.line.me/search/sticker/en?q=hatsune+miku
+```
+
+Example downloading author stickers https://store.line.me/stickershop/author/27290/en
+```shell
+.\line-sticker-downloader.exe https://store.line.me/stickershop/author/27290/en
 ```
