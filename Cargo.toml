@@ -12,3 +12,7 @@ tokio = { version ="1.41.1", features = ["full"] }
 scraper = "0.21.0"
 regex = "1.11.1"
 serde_json = "1.0.133"
+
+
+[dev-dependencies]
+mockito = "1.6.1"
