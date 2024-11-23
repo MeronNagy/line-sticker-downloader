@@ -1,16 +1,15 @@
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde_json::Value;
-use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct Item {
     #[serde(rename = "productUrl")]
     product_url: String,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, serde::Deserialize)]
 struct SearchResponse {
     #[serde(rename = "totalCount")]
     total_count: u32,
@@ -32,16 +31,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Failed to fetch stickers: {}", err);
             })
         } else {
-            download_stickers_from_search_query(arg).await.unwrap_or_else(|err| {
-                eprintln!("Failed to fetch stickers: {}", err);
-            })
+            download_stickers_from_search_query(arg)
+                .await
+                .unwrap_or_else(|err| {
+                    eprintln!("Failed to fetch stickers: {}", err);
+                })
         }
     }
 
     Ok(())
 }
 
-async fn download_stickers_from_search_query(search_query: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn download_stickers_from_search_query(
+    search_query: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let limit = 36;
     let mut offset = 0;
 
@@ -82,15 +85,17 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
 
     while let Some(url) = url_queue.pop_front() {
         let response = reqwest::get(&url).await?.text().await?;
-        let document = Html::parse_document(response.as_str());
+        let document = Html::parse_document(&response);
 
         if url.contains("/stickershop/author/") {
             url_queue.extend(extract_author_page_urls(url, document)?);
             continue;
         }
 
-        let directory = sanitize_directory_name(&extract_title_from_document(&document)?);
+        let title = extract_title_from_document(&document)?;
+        println!("Downloading {}", title);
 
+        let directory = sanitize_directory_name(&title);
         for (id, value) in extract_sticker_data_from_document(&document)? {
             if let Some(url) = value.get("soundUrl").and_then(|v| v.as_str()) {
                 if !url.is_empty() {
@@ -128,7 +133,7 @@ fn extract_author_page_urls(
     }
 
     if let Some(href) = extract_next_button_href(document)? {
-        urls.insert(update_url(&url, href.as_str())?);
+        urls.insert(update_url(&url, &href)?);
     }
 
     Ok(urls)
@@ -396,9 +401,7 @@ mod tests {
             .create_async()
             .await;
 
-        download_stickers(format!("{}/test", url).as_str())
-            .await
-            .unwrap();
+        download_stickers(&format!("{}/test", url)).await.unwrap();
         let dir_path = std::path::Path::new("THE POWERPUFF GIRLS X NEWJEANS");
         assert!(
             dir_path.exists(),
@@ -422,7 +425,7 @@ mod tests {
             .create_async()
             .await;
 
-        let actual = download_stickers(format!("{}/test", url).as_str()).await;
+        let actual = download_stickers(&format!("{}/test", url)).await;
         assert!(actual.is_ok(), "{}", actual.unwrap_err());
     }
 
@@ -459,7 +462,7 @@ mod tests {
             .create_async()
             .await;
 
-        let actual = download_stickers(format!("{}/stickershop/author/test", url).as_str()).await;
+        let actual = download_stickers(&format!("{}/stickershop/author/test", url)).await;
         assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 
