@@ -1,3 +1,4 @@
+use regex::Regex;
 use scraper::{Html, Selector};
 
 #[tokio::main]
@@ -26,7 +27,7 @@ async fn download_stickers(url: &str) -> Result<(), Box<dyn std::error::Error>> 
     let resp = client.get(url).send().await?.text().await?;
     let document = Html::parse_document(resp.as_str());
 
-    let directory = get_title(&document);
+    let directory = sanitize_directory_name(&get_title(&document));
     println!("Creating dir: {}", directory);
     std::fs::create_dir_all(&directory)?;
 
@@ -40,7 +41,7 @@ async fn download_stickers(url: &str) -> Result<(), Box<dyn std::error::Error>> 
     }
 
     for img_url in img_urls {
-        let re = regex::Regex::new(r"/(\d+)/").unwrap();
+        let re = Regex::new(r"/(\d+)/").unwrap();
         let id = re.captures(&img_url).unwrap().get(1).unwrap().as_str();
         let file_path = format!("{}/{:03}.png", directory, id);
 
@@ -68,7 +69,52 @@ fn get_title(document: &Html) -> String {
 }
 
 fn extract_image_url(style: &str) -> String {
+    println!("Extracting image: {}", style);
     let url_start = style.find("https").unwrap();
 
     style[url_start..].split("?").next().unwrap().to_string()
+}
+
+fn sanitize_directory_name(name: &str) -> String {
+    let name = name.replace("/", "_");
+
+    let re = Regex::new(r#"[<>:"\\|?*]"#).unwrap();
+    re.replace_all(&name, "").to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_title() {
+        let document = Html::parse_document(r#"<div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>"#);
+        let result = get_title(&document);
+        assert_eq!(result, "We are NewJeans☆")
+    }
+
+    #[test]
+    fn test_extract_image_url() {
+        let result = extract_image_url("background-image:url(https://stickershop.line-scdn.net/stickershop/v1/sticker/714004505/android/sticker.png?v=1);");
+        assert_eq!(result, "https://stickershop.line-scdn.net/stickershop/v1/sticker/714004505/android/sticker.png")
+    }
+
+    #[test]
+    fn test_sanitize_directory_name() {
+        // Should replace '/' with '_'
+        let result = sanitize_directory_name("Ranma1/2");
+        assert_eq!(result, "Ranma1_2");
+
+        // Should replace ':' with empty string
+        let result = sanitize_directory_name("The Legend of Zelda: Breath of the Wild");
+        assert_eq!(result, "The Legend of Zelda Breath of the Wild");
+
+        // Should not replace anything.
+        let result = sanitize_directory_name("We are NewJeans☆");
+        assert_eq!(result, "We are NewJeans☆");
+        let result = sanitize_directory_name("Pikachu, Switch Out! Come Back!");
+        assert_eq!(result, "Pikachu, Switch Out! Come Back!");
+        let result = sanitize_directory_name("Yarn Yoshi & Poochy Stickers");
+        assert_eq!(result, "Yarn Yoshi & Poochy Stickers");
+    }
 }
