@@ -1,7 +1,21 @@
 use regex::Regex;
 use scraper::{Html, Selector};
 use serde_json::Value;
+use serde::Deserialize;
 use std::collections::{HashMap, HashSet, VecDeque};
+
+#[derive(Debug, Deserialize)]
+struct Item {
+    #[serde(rename = "productUrl")]
+    product_url: String,
+}
+
+#[derive(Debug, Deserialize)]
+struct SearchResponse {
+    #[serde(rename = "totalCount")]
+    total_count: u32,
+    items: Vec<Item>,
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -12,15 +26,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         std::process::exit(1);
     }
 
-    for url in &args[1..] {
-        if url::Url::parse(url).is_ok() {
-            println!("Fetching {}", url);
-            download_stickers(url).await.unwrap_or_else(|err| {
+    for arg in &args[1..] {
+        if url::Url::parse(arg).is_ok() {
+            download_stickers(arg).await.unwrap_or_else(|err| {
                 eprintln!("Failed to fetch stickers: {}", err);
             })
         } else {
-            eprintln!("{} is not a valid URL skipping.", url);
+            download_stickers_from_search_query(arg).await.unwrap_or_else(|err| {
+                eprintln!("Failed to fetch stickers: {}", err);
+            })
         }
+    }
+
+    Ok(())
+}
+
+async fn download_stickers_from_search_query(search_query: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let limit = 36;
+    let mut offset = 0;
+
+    loop {
+        let url = format!(
+            "https://store.line.me/api/search/sticker?category=sticker&type=ALL&offset={}&limit={}&includeFacets=false&query={}",
+            offset,
+            limit,
+            search_query,
+        );
+
+        let response = reqwest::get(&url).await?;
+        let json: SearchResponse = response.json().await?;
+        let total_count = json.total_count;
+        let items = json.items;
+
+        download_items(items).await?;
+
+        offset += limit;
+        if offset >= total_count {
+            return Ok(());
+        }
+    }
+}
+
+async fn download_items(items: Vec<Item>) -> Result<(), Box<dyn std::error::Error>> {
+    for item in items {
+        let url = format!("https://store.line.me{}", item.product_url);
+        download_stickers(&url).await?
     }
 
     Ok(())
@@ -36,11 +86,6 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
 
         if url.contains("/stickershop/author/") {
             url_queue.extend(extract_author_page_urls(url, document)?);
-            continue;
-        }
-
-        if url.contains("/search/sticker/") {
-            url_queue.extend(extract_search_page_urls(url, document)?);
             continue;
         }
 
@@ -64,26 +109,6 @@ async fn download_stickers(initial_url: &str) -> Result<(), Box<dyn std::error::
     }
 
     Ok(())
-}
-
-fn extract_search_page_urls(
-    url: String,
-    document: Html,
-) -> Result<HashSet<String>, Box<dyn std::error::Error>> {
-    let mut urls: HashSet<String> = HashSet::new();
-
-    let ul_selector = Selector::parse(r#"ul[data-test="search-sticker-item-list"] a"#)?;
-    for element in document.select(&ul_selector) {
-        if let Some(href) = element.value().attr("href") {
-            urls.insert(update_url(&url, href)?);
-        }
-    }
-
-    if let Some(href) = extract_next_button_href(document)? {
-        urls.insert(update_url(&url, href.as_str())?);
-    }
-
-    Ok(urls)
 }
 
 fn extract_author_page_urls(
@@ -438,42 +463,6 @@ mod tests {
         assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 
-    #[tokio::test]
-    async fn test_download_stickers_search_page_invalid_href() {
-        let mut server = mockito::Server::new_async().await;
-
-        let url = server.url();
-        let _m = server
-            .mock("GET", "/search/sticker/en?q=sanrio")
-            .with_status(200)
-            .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body(r#"
-                <ul data-v-5019b439="" data-v-52659312="" data-test="search-sticker-item-list">
-                    <li data-v-5019b439="">
-                        <a data-v-734783a5="" data-v-5019b439="" href="/stickershop/product/33267/en"></a>
-                    </li>
-                </ul>
-            "#)
-            .create_async()
-            .await;
-
-        let _m2 = server
-            .mock("GET", "/stickershop/product/33267/en")
-            .with_status(200)
-            .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body(
-                r#"
-                <div></div>
-            "#,
-            )
-            .create_async()
-            .await;
-
-        let actual =
-            download_stickers(format!("{}/search/sticker/en?q=sanrio", url).as_str()).await;
-        assert!(actual.is_err(), "{}", actual.unwrap_err());
-    }
-
     fn delete_directory_if_exists(directory: &str) {
         let directory_path = std::path::Path::new(directory);
         if directory_path.exists() {
@@ -503,30 +492,6 @@ mod tests {
         assert_eq!(actual.len(), 2);
         assert!(actual.contains("https://store.line.me/stickershop/product/32279/en"));
         assert!(actual.contains("https://store.line.me/stickershop/author/32/en?page=2"));
-    }
-
-    #[test]
-    fn test_extract_search_page_urls() {
-        let document = Html::parse_document(
-            r#"
-            <ul data-v-5019b439="" data-v-52659312="" data-test="search-sticker-item-list">
-                <li data-v-5019b439="">
-                    <a data-v-734783a5="" data-v-5019b439="" href="/stickershop/product/33267/en"></a>
-                </li>
-            </ul>
-            <a data-v-06abf17a="" aria-current="page" href="/search/sticker/en?q=sanrio&amp;page=2" class="router-link-active router-link-exact-active next-page" data-test="next-btn">Next</a>
-        "#,
-        );
-
-        let actual = extract_search_page_urls(
-            "https://store.line.me/search/sticker/en?q=sanrio".to_string(),
-            document,
-        )
-        .unwrap();
-
-        assert_eq!(actual.len(), 2);
-        assert!(actual.contains("https://store.line.me/stickershop/product/33267/en"));
-        assert!(actual.contains("https://store.line.me/search/sticker/en?q=sanrio&page=2"));
     }
 
     #[test]

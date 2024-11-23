@@ -1,6 +1,6 @@
 # line-sticker-downloader
 
-Simple command line tool to download stickers of LINE STORE sticker shop.
+Simple[target](target) command line tool to download stickers of LINE STORE sticker shop.
 https://store.line.me/stickershop/product/22239964/en
 
 Usage:  
@@ -13,9 +13,9 @@ Example downloading specific stickers
 .\line-sticker-downloader.exe https://store.line.me/stickershop/product/28170905/en https://store.line.me/stickershop/product/683/en
 ```
 
-Example downloading search https://store.line.me/search/sticker/en?q=hatsune+miku
+Example downloading via search query "Hatsune Miku"
 ```shell
-.\line-sticker-downloader.exe https://store.line.me/search/sticker/en?q=hatsune+miku
+.\line-sticker-downloader.exe hatsune+miku
 ```
 
 Example downloading author stickers https://store.line.me/stickershop/author/27290/en
