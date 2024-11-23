@@ -19,7 +19,7 @@ jobs:
       - name: Generate timestamp version
         id: set-version
         run: |
-          VERSION="nightly-$(date +'%Y%m%d%H%M%S')"
+          VERSION="$(date +'%Y%m%d%H%M%S')"
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "$VERSION"
 
