@@ -477,7 +477,6 @@ mod tests {
         assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 
-    #[cfg(not(coverage))]
     fn delete_directory_if_exists(directory: &str) {
         let directory_path = std::path::Path::new(directory);
         if directory_path.exists() {
