@@ -9,7 +9,7 @@ codecov:
         informational: true
 
 comment:
-  layout: "condensed_header, condensed_files, condensed_footer"
+  layout: "condensed_header, condensed_files"
   behavior: default
   require_changes: false
   hide_project_coverage: true
