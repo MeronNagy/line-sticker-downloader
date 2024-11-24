@@ -12,13 +12,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@v2
         with:
-          components: llvm-tools
-      - uses: taiki-e/install-action@cargo-llvm-cov
-      - run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+          tool: cargo-tarpaulin
+
+      - name: Generate coverage reports
+        run: cargo tarpaulin --all-features --out Xml --out Lcov
+
       - uses: codecov/codecov-action@v5
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: true
           files: lcov.info
+          verbose: true
+
+      - uses: codecov/test-results-action@v1
+        with:
           token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: true
+          files: cobertura.xml
           verbose: true
