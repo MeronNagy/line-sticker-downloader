@@ -78,14 +78,10 @@ async fn download_stickers_from_search_query(
 
 async fn download_items(
     base_url: &str,
-    items: Vec<Item>
+    items: Vec<Item>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     for item in items {
-        let url = format!(
-            "{}{}",
-            base_url,
-            item.product_url
-        );
+        let url = format!("{}{}", base_url, item.product_url);
         download_stickers(&url).await?
     }
 
@@ -277,9 +273,11 @@ mod tests {
 
     #[test]
     fn test_extract_title_from_document() {
-        let document = Html::parse_document(r#"
+        let document = Html::parse_document(
+            r#"
             <div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>
-        "#);
+        "#,
+        );
         let actual = extract_title_from_document(&document);
         assert_eq!(actual.unwrap(), "We are NewJeans☆");
     }
@@ -294,15 +292,15 @@ mod tests {
 
     #[test]
     fn test_extract_sticker_data_from_document() {
-        let document = Html::parse_document(r#"
-            <ul>
-                <li class="for_testing"></li>
-                <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
-                <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
-                <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
-                <li class="for_testing"></li>
-            </ul>
-        "#);
+        let document = Html::parse_document(
+            r#"<ul>
+                    <li class="for_testing"></li>
+                    <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
+                    <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
+                    <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
+                    <li class="for_testing"></li>
+                </ul>"#,
+        );
 
         let sticker_data = extract_sticker_data_from_document(&document).unwrap();
 
@@ -325,11 +323,13 @@ mod tests {
 
     #[test]
     fn test_extract_sticker_data_from_document_error() {
-        let document = Html::parse_document(r#"
+        let document = Html::parse_document(
+            r#"
             <ul>
                 <li class="FnStickerPreviewItem" data-preview="{ []{{]]}{{fsdfsf435 }">
             </ul>
-        "#);
+        "#,
+        );
 
         let actual = extract_sticker_data_from_document(&document);
 
@@ -449,13 +449,15 @@ mod tests {
             .mock("GET", "/stickershop/author/test")
             .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body(r#"
+            .with_body(
+                r#"
                 <ul>
                     <li class="mdCMN02Li" data-test="author-item">
                         <a href="/test">
                     </li>
                 </ul>
-            "#)
+            "#,
+            )
             .create_async()
             .await;
 
@@ -463,9 +465,11 @@ mod tests {
             .mock("GET", "/test")
             .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body(r#"
+            .with_body(
+                r#"
                 <div></div>
-            "#)
+            "#,
+            )
             .create_async()
             .await;
 
@@ -482,14 +486,16 @@ mod tests {
 
     #[test]
     fn test_extract_author_page_urls() {
-        let document = Html::parse_document(r#"
+        let document = Html::parse_document(
+            r#"
             <ul>
                 <li class="mdCMN02Li" data-test="author-item">
                     <a href="/stickershop/product/32279/en">
                 </li>
             </ul>
             <a class="mdCMN14Next" href="?page=2" data-test="next-btn">Next</a>
-        "#);
+        "#,
+        );
 
         let actual = extract_author_page_urls(
             "https://store.line.me/stickershop/author/32/en".to_string(),
