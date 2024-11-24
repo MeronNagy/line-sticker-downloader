@@ -362,8 +362,6 @@ mod tests {
     }
     #[tokio::test]
     async fn test_download_stickers_animated_with_sound() {
-        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
-
         let mut server = mockito::Server::new_async().await;
 
         let url = server.url();
@@ -397,8 +395,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_stickers_static() {
-        delete_directory_if_exists("THE POWERPUFF GIRLS X NEWJEANS");
-
         let mut server = mockito::Server::new_async().await;
 
         let url = server.url();
@@ -547,8 +543,6 @@ mod tests {
 
     #[tokio::test]
     async fn test_download_items() {
-        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
-
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
@@ -557,7 +551,7 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
             .with_body(r#"
-                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Pokémon Pixel Art: Gold & Silver Edition</p>
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Test Download Items</p>
                 <ul>
                     <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578551&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
                 </ul>
@@ -572,23 +566,21 @@ mod tests {
         let actual = download_items(&url, items).await;
         assert!(actual.is_ok(), "{}", actual.unwrap_err());
 
-        let dir_path = std::path::Path::new("Pokémon Pixel Art Gold & Silver Edition");
+        let dir_path = std::path::Path::new("Test Download Items");
         assert!(
             dir_path.exists(),
-            "Directory 'Pokémon Pixel Art Gold & Silver Edition' does not exist"
+            "Directory 'Test Download Items' does not exist"
         );
         let file_path = dir_path.join("20578551.m4a");
         assert!(file_path.exists(), "File '20578551.m4a' does not exist");
         let file_path = dir_path.join("20578551.png");
         assert!(file_path.exists(), "File '20578551.png' does not exist");
 
-        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
+        delete_directory_if_exists("Test Download Items");
     }
 
     #[tokio::test]
     async fn test_download_stickers_from_search_query() {
-        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
-
         let mut server = mockito::Server::new_async().await;
         let url = server.url();
 
@@ -605,7 +597,7 @@ mod tests {
             .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
             .with_body(r#"
-                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Pokémon Pixel Art: Gold & Silver Edition</p>
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Hatsune Miku</p>
             "#)
             .create_async()
             .await;
@@ -613,13 +605,13 @@ mod tests {
         let actual = download_stickers_from_search_query(&url, "hatsune+miku").await;
         assert!(actual.is_ok(), "{}", actual.unwrap_err());
 
-        let dir_path = std::path::Path::new("Pokémon Pixel Art Gold & Silver Edition");
+        let dir_path = std::path::Path::new("Hatsune Miku");
 
         assert!(
             !dir_path.exists(),
-            "Directory 'Pokémon Pixel Art Gold & Silver Edition' should not exist because no download happened."
+            "Directory 'Hatsune Miku' should not exist because no download happened."
         );
 
-        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
+        delete_directory_if_exists("Hatsune Miku");
     }
 }
