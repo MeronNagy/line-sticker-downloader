@@ -546,8 +546,15 @@ mod tests {
 
     #[test]
     fn test_update_url_path_and_query() {
-        let actual = update_url("https://store.line.me/stickershop/author/32/en", "/stickershop/product/20095/en?page=1").unwrap();
-        assert_eq!(actual, "https://store.line.me/stickershop/product/20095/en?page=1");
+        let actual = update_url(
+            "https://store.line.me/stickershop/author/32/en",
+            "/stickershop/product/20095/en?page=1",
+        )
+        .unwrap();
+        assert_eq!(
+            actual,
+            "https://store.line.me/stickershop/product/20095/en?page=1"
+        );
     }
 
     #[tokio::test]
