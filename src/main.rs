@@ -31,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 eprintln!("Failed to fetch stickers: {}", err);
             })
         } else {
-            download_stickers_from_search_query(arg)
+            download_stickers_from_search_query("https://store.line.me", arg)
                 .await
                 .unwrap_or_else(|err| {
                     eprintln!("Failed to fetch stickers: {}", err);
@@ -43,6 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn download_stickers_from_search_query(
+    base_url: &str,
     search_query: &str,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let limit = 36;
@@ -50,7 +51,8 @@ async fn download_stickers_from_search_query(
 
     loop {
         let url = format!(
-            "https://store.line.me/api/search/sticker?category=sticker&type=ALL&offset={}&limit={}&includeFacets=false&query={}",
+            "{}/api/search/sticker?category=sticker&type=ALL&offset={}&limit={}&includeFacets=false&query={}",
+            base_url,
             offset,
             limit,
             search_query,
@@ -65,7 +67,7 @@ async fn download_stickers_from_search_query(
             "Fetching Stickers for query: {} Page: {}",
             search_query, offset
         );
-        download_items(items).await?;
+        download_items(base_url, items).await?;
 
         offset += limit;
         if offset >= total_count {
@@ -74,9 +76,12 @@ async fn download_stickers_from_search_query(
     }
 }
 
-async fn download_items(items: Vec<Item>) -> Result<(), Box<dyn std::error::Error>> {
+async fn download_items(
+    base_url: &str,
+    items: Vec<Item>,
+) -> Result<(), Box<dyn std::error::Error>> {
     for item in items {
-        let url = format!("https://store.line.me{}", item.product_url);
+        let url = format!("{}{}", base_url, item.product_url);
         download_stickers(&url).await?
     }
 
@@ -269,7 +274,9 @@ mod tests {
     #[test]
     fn test_extract_title_from_document() {
         let document = Html::parse_document(
-            r#"<div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>"#,
+            r#"
+            <div class="mdCMN38Item0lHead"><p class="mdCMN38Item01Ttl" data-test="sticker-name-title">We are NewJeans☆</p></div>
+        "#,
         );
         let actual = extract_title_from_document(&document);
         assert_eq!(actual.unwrap(), "We are NewJeans☆");
@@ -286,15 +293,13 @@ mod tests {
     #[test]
     fn test_extract_sticker_data_from_document() {
         let document = Html::parse_document(
-            r#"
-            <ul>
-                <li class="for_testing"></li>
-                <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
-                <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
-                <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
-                <li class="for_testing"></li>
-            </ul>
-        "#,
+            r#"<ul>
+                    <li class="for_testing"></li>
+                    <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578528&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578528/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
+                    <li class="for_testing" data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;1&quot;}"></li>
+                    <li class="mdCMN09Li FnStickerPreviewItem animation-sticker " data-preview="{ &quot;type&quot; : &quot;animation&quot;, &quot;id&quot; : &quot;651763951&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker@2x.png?v=2&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/651763951/iPhone/sticker_animation@2x.png?v=2&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;&quot; }" data-test="sticker-item">
+                    <li class="for_testing"></li>
+                </ul>"#,
         );
 
         let sticker_data = extract_sticker_data_from_document(&document).unwrap();
@@ -534,5 +539,43 @@ mod tests {
     fn test_update_url_error() {
         let actual = update_url("not-a-url", "/stickershop/product/20095/en");
         assert!(actual.is_err(), "{}", actual.unwrap_err());
+    }
+
+    #[tokio::test]
+    async fn test_download_items() {
+        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(r#"
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Pokémon Pixel Art: Gold & Silver Edition</p>
+                <ul>
+                    <li class="mdCMN09Li FnStickerPreviewItem animation_sound-sticker " data-preview="{ &quot;type&quot; : &quot;animation_sound&quot;, &quot;id&quot; : &quot;20578551&quot;, &quot;staticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker@2x.png?v=1&quot;, &quot;fallbackStaticUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker@2x.png?v=1&quot;, &quot;animationUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/iPhone/sticker_animation@2x.png?v=1&quot;, &quot;popupUrl&quot; : &quot;&quot;, &quot;soundUrl&quot; : &quot;https://stickershop.line-scdn.net/stickershop/v1/sticker/20578551/android/sticker_sound.m4a?v=1&quot; }" data-test="sticker-item"></li>
+                </ul>
+            "#)
+            .create_async()
+            .await;
+
+        let items = vec![Item {
+            product_url: String::from("/test"),
+        }];
+
+        let actual = download_items(&url, items).await;
+        assert!(actual.is_ok(), "{}", actual.unwrap_err());
+
+        let dir_path = std::path::Path::new("Pokémon Pixel Art Gold & Silver Edition");
+        assert!(
+            dir_path.exists(),
+            "Directory 'Pokémon Pixel Art Gold & Silver Edition' does not exist"
+        );
+        let file_path = dir_path.join("20578551.m4a");
+        assert!(file_path.exists(), "File '20578551.m4a' does not exist");
+        let file_path = dir_path.join("20578551.png");
+        assert!(file_path.exists(), "File '20578551.png' does not exist");
     }
 }
