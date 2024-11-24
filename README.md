@@ -1,4 +1,5 @@
 # line-sticker-downloader
+[![codecov](https://codecov.io/gh/MeronNagy/line-sticker-downloader/graph/badge.svg?token=65PP4EBJI9)](https://codecov.io/gh/MeronNagy/line-sticker-downloader)
 
 Simple command line tool to download stickers of LINE STORE sticker shop.
 https://store.line.me/stickershop/product/22239964/en
