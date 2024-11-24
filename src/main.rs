@@ -596,9 +596,11 @@ mod tests {
             .mock("GET", "/test")
             .with_status(200)
             .with_header("content-type", "text/html;charset=UTF-8")
-            .with_body(r#"
+            .with_body(
+                r#"
                 <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Hatsune Miku</p>
-            "#)
+            "#,
+            )
             .create_async()
             .await;
 
