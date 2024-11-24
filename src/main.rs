@@ -391,6 +391,8 @@ mod tests {
         assert!(file_path.exists(), "File '20578551.m4a' does not exist");
         let file_path = dir_path.join("20578551.png");
         assert!(file_path.exists(), "File '20578551.png' does not exist");
+
+        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
     }
 
     #[tokio::test]
@@ -420,6 +422,8 @@ mod tests {
         );
         let file_path = dir_path.join("616659318.png");
         assert!(file_path.exists(), "File '616659318.png' does not exist");
+
+        delete_directory_if_exists("THE POWERPUFF GIRLS X NEWJEANS");
     }
 
     #[tokio::test]
@@ -577,6 +581,8 @@ mod tests {
         assert!(file_path.exists(), "File '20578551.m4a' does not exist");
         let file_path = dir_path.join("20578551.png");
         assert!(file_path.exists(), "File '20578551.png' does not exist");
+
+        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
     }
 
     #[tokio::test]
@@ -613,5 +619,7 @@ mod tests {
             !dir_path.exists(),
             "Directory 'Pokémon Pixel Art Gold & Silver Edition' should not exist because no download happened."
         );
+
+        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
     }
 }
