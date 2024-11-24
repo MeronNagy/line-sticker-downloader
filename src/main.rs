@@ -20,22 +20,25 @@ struct SearchResponse {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
 
+    process_args("https://store.line.me", &args).await?;
+
+    Ok(())
+}
+
+async fn process_args(base_url: &str, args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     if args.len() < 2 {
-        eprintln!("Usage: {} <url1> <url2> ...", args[0]);
-        std::process::exit(1);
+        return Err("Usage: line-sticker-downloader <url1> <url2> ...".into());
     }
 
     for arg in &args[1..] {
-        if url::Url::parse(arg).is_ok() {
-            download_stickers(arg).await.unwrap_or_else(|err| {
-                eprintln!("Failed to fetch stickers: {}", err);
-            })
+        let result = if url::Url::parse(arg).is_ok() {
+            download_stickers(arg).await
         } else {
-            download_stickers_from_search_query("https://store.line.me", arg)
-                .await
-                .unwrap_or_else(|err| {
-                    eprintln!("Failed to fetch stickers: {}", err);
-                })
+            download_stickers_from_search_query(base_url, arg).await
+        };
+
+        if let Err(err) = result {
+            return Err(format!("Failed to fetch stickers: {}", err).into());
         }
     }
 
@@ -541,6 +544,19 @@ mod tests {
         assert!(actual.is_err(), "{}", actual.unwrap_err());
     }
 
+    #[test]
+    fn test_update_url_path_and_query() {
+        let actual = update_url(
+            "https://store.line.me/stickershop/author/32/en",
+            "/stickershop/product/20095/en?page=1",
+        )
+        .unwrap();
+        assert_eq!(
+            actual,
+            "https://store.line.me/stickershop/product/20095/en?page=1"
+        );
+    }
+
     #[tokio::test]
     async fn test_download_items() {
         let mut server = mockito::Server::new_async().await;
@@ -615,5 +631,110 @@ mod tests {
         );
 
         delete_directory_if_exists("Hatsune Miku");
+    }
+
+    #[tokio::test]
+    async fn test_process_args_missing_args() {
+        let args = vec!["program_name".to_string()];
+        let result = process_args("https://store.line.me", &args).await;
+
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Usage: line-sticker-downloader <url1> <url2> ..."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_args_with_url() {
+        let mut server = mockito::Server::new_async().await;
+        let base_url = server.url();
+
+        let _m = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(
+                r#"
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Test Stickers</p>
+            "#,
+            )
+            .create_async()
+            .await;
+
+        let args = vec!["program_name".to_string(), format!("{}/test", base_url)];
+
+        let result = process_args(&base_url, &args).await;
+        assert!(result.is_ok(), "Failed to process args: {:?}", result.err());
+
+        let dir_path = std::path::Path::new("Test Stickers");
+        assert!(
+            !dir_path.exists(),
+            "Directory 'Test Stickers' should not exist because no download happened."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_args_with_invalid_url() {
+        let mut server = mockito::Server::new_async().await;
+        let base_url = server.url();
+
+        let _m = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(
+                r#"
+                <div></div>
+            "#,
+            )
+            .create_async()
+            .await;
+
+        let args = vec!["program_name".to_string(), format!("{}/test", base_url)];
+
+        let result = process_args(&base_url, &args).await;
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "Failed to fetch stickers: Could not find the sticker-name-title in the document. Please check that the URL points to a valid sticker page."
+        );
+    }
+
+    #[tokio::test]
+    async fn test_process_args_with_search_query() {
+        let mut server = mockito::Server::new_async().await;
+        let base_url = server.url();
+
+        let _m = server
+            .mock("GET", "/api/search/sticker?category=sticker&type=ALL&offset=0&limit=36&includeFacets=false&query=test")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"totalCount":1,"items":[{"productUrl": "/test"}]}"#)
+            .create_async()
+            .await;
+
+        let _m2 = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(
+                r#"
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Test Search Results</p>
+            "#,
+            )
+            .create_async()
+            .await;
+
+        let args = vec!["program_name".to_string(), "test".to_string()];
+
+        let result = process_args(&base_url, &args).await;
+        assert!(result.is_ok(), "Failed to process args: {:?}", result.err());
+
+        let dir_path = std::path::Path::new("Test Search Results");
+        assert!(
+            !dir_path.exists(),
+            "Directory 'Test Search Results' should not exist because no download happened."
+        );
     }
 }
