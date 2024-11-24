@@ -578,4 +578,40 @@ mod tests {
         let file_path = dir_path.join("20578551.png");
         assert!(file_path.exists(), "File '20578551.png' does not exist");
     }
+
+    #[tokio::test]
+    async fn test_download_stickers_from_search_query() {
+        delete_directory_if_exists("Pokémon Pixel Art Gold & Silver Edition");
+
+        let mut server = mockito::Server::new_async().await;
+        let url = server.url();
+
+        let _m = server
+            .mock("GET", "/api/search/sticker?category=sticker&type=ALL&offset=0&limit=36&includeFacets=false&query=hatsune+miku")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(r#"{"totalCount":1,"items":[{"productUrl": "/test"}]}"#)
+            .create_async()
+            .await;
+
+        let _m2 = server
+            .mock("GET", "/test")
+            .with_status(200)
+            .with_header("content-type", "text/html;charset=UTF-8")
+            .with_body(r#"
+                <p class="mdCMN38Item01Ttl" data-test="sticker-name-title">Pokémon Pixel Art: Gold & Silver Edition</p>
+            "#)
+            .create_async()
+            .await;
+
+        let actual = download_stickers_from_search_query(&url, "hatsune+miku").await;
+        assert!(actual.is_ok(), "{}", actual.unwrap_err());
+
+        let dir_path = std::path::Path::new("Pokémon Pixel Art Gold & Silver Edition");
+
+        assert!(
+            !dir_path.exists(),
+            "Directory 'Pokémon Pixel Art Gold & Silver Edition' should not exist because no download happened."
+        );
+    }
 }
