@@ -14,7 +14,11 @@ jobs:
         with:
           components: llvm-tools
       - uses: taiki-e/install-action@cargo-llvm-cov
+
       - run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+        env:
+          RUSTFLAGS: "-C instrument-coverage -C overflow-checks=off --cfg=coverage --cfg=trybuild_no_target"
+
       - uses: codecov/codecov-action@v5
         with:
           fail_ci_if_error: true
